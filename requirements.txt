@@ -1,0 +1,13 @@
+# Web Scraping
+requests
+beautifulsoup4
+
+# AI & LLM
+langchain
+langchain-openai
+openai
+pydantic
+
+# Utilities
+python-dotenv
+pytest
