@@ -126,6 +126,92 @@ class AgentMemory:
         }
     
 #BASE AGENT CLASS
+class BaseAgent(ABC):
+    #this is Abstract base class for all AI agents
+    def __init__(self, name: str, description: str):
+        self.name = name
+        self.description = description
+        self.tools = {} #tools this agent can use
+        self.memory = AgentMemory() #Agent's memory
+        self.max_iterations = 10 #this prevent infinite loop
+
+        logger.info(f"Initialized agent: {name}")
+
+    #TOOL MANAGEMENT
+    def register_tool(self, tool: Tool ) -> None:
+        #register the tool the agent can use means telling the agent you can use this tool
+        self.tools[tool.name] = tool
+        logger.info(f"Registered Tool: {tool.name}")
+
+    #LIST OF TOOLS
+    def get_tools(self) -> list:
+        #this gives the list of all the tools the agent has
+        return[tool.to_dict() for tool in self.tools.values()]
+    
+
+    #THINKING AND REASONING
+    def think(self, task: str) -> str:
+        #this is where we call the OPENAI.. The agent thinks what to do
+        thought = f"I need to complete task: {task}"
+        self.memory.add_thoughts(thought)
+        return thought
+    
+    def decide_tool(self, task: str) -> str:
+        #Agent decide which tool to use
+        #THIS IS AGENT INTELLIGENCE!
+        # Given a task, which tool should I use?
+
+        if 'scrape' in task.lower():
+            return 'scrape_website'
+        elif 'analyze' in task.lower():
+            return 'analyze'
+        elif 'summarize' in task.lower():
+            return 'summarize'
+        else: 
+            return list(self.tools.keys())[0] if self.tools else None
+        
+    #Execute the tool which the agent has decided
+    def execute_tool(self, tool_name: str, **params) -> Any:
+        if tool_name not in self.tools:
+            logger.error(f"Tool not found: {tool_name}")
+            return f"Error: Tool '{tool_name}' not found"
+        
+        tool = self.tools[tool_name]
+        result = tool.execute(**params)
+        self.memory.add_tool_call(tool_name, params, result)
+
+        return result
+    
+    #ABSTRACT RUN METHOD
+    @abstractmethod
+    def run(self, task: str) -> str:
+        pass
+
+    #UTILITY METHODS
+    #this gives the summary of what agent did
+    def get_memory_summary(self) -> dict:
+        return self.memory.get_summary()
+    
+    def clear_memory(self) -> None:
+        #this clears agent memory to start fresh
+        self.memory = AgentMemory()
+        logger.info(f"Cleared Memory for {self.name}")
+
+    def get_status(self) -> dict:
+        #this gives the agents current status
+        return{
+            'name': self.name,
+            'description': self.description,
+            'tools_available': len(self.tools),
+            'tools_name': list(self.tools.keys()),
+            'memory_entries': len(self.memory.get_history())
+        }
+
+
+
+
+
+        
 
 
 
