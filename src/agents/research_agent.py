@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
-from .base_agent import BaseAgent, Tool
+from base_agent import BaseAgent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -96,4 +96,120 @@ class ResearchAgent(BaseAgent):
         analysis = self._analyze_data(scraped_data, parsed_task)
 
         #STEP: 05 (COMPILE RESULTS)
+
+        research_result = {} #empty dictionary to store results
+        
+        research_result['query'] = parsed_task.get('query') #stores what we researched remembers what user asked
+
+        #store the data we got
+        research_result['scraped_data'] = scraped_data
+
+        research_result['analysis'] = analysis
+
+        research_result['success'] = True #marked the research as successful
+
+        self.research_results.append(research_result)
+        logger.info("Research Completed Successfully")
+        
+        return research_result
+    
+    #HELPER METHODS (private only used internally)
+    def _parse_task(self, task: str) -> dict:
+
+        #first check if the string is proper
+        if not task or not isinstance(task, str):
+            logger.error("Invalid task format")
+            return{}
+        
+        task_lower = task.lower()
+
+        #now to store the parsed data
+        parsed = {}
+
+        parsed['topic'] = task
+
+        #decide which type of research should the agent do
+        if 'bitcoin' in task_lower or 'btc' in task_lower:
+            parsed['query'] = 'bitcoin'
+            parsed['type'] = 'crypto'
+        elif 'news' in task_lower:
+            parsed['query'] = 'news'
+            parsed['type'] = 'news'
+        else:
+            parsed['query'] = task
+            parsed['type'] = 'general'
+
+        logger.info(f"Parsed Task: {parsed}")
+        return parsed
+    
+    def _decide_scraper(self, parsed_task: dict) -> str:
+        #decide which scraper to use based on task
+        task_type = parsed_task.get('type', 'general')
+
+        if task_type == 'crypto':
+            return 'crypto'
+        
+        elif task_type == 'news':
+            return 'news'
+        
+        else: 
+            return 'crypto'
+        
+    
+    def _execute_scraper(self, scraper: Any, parsed_task: dict) -> Any:
+        try:
+            query = parsed_task.get('query') #gets what to research
+
+            if hasattr(scraper, 'fetch_prices'):
+                return scraper.fetch_prices([query])
+            
+            elif hasattr(scraper, 'fetch_article'):
+                return scraper.fetch_article(query)
+            
+            else:
+                logger.error("Scrapper has no recognized method")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Scrapper error: {e}")
+            return None
+        
+    def _analyze_data(self, data: Any, parsed_task: dict) -> str:
+            if not data:
+                return "No Data to analyze"
+            
+            analysis = f"Research findings for {parsed_task.get('topic')}:\n"
+
+            analysis += f"Data obtained: {str(data)[:200]}...\n"
+
+            return analysis
+    
+    #PUBLIC UTILITY METHODS
+    def get_research_history(self) -> list:
+
+        #get all the research history
+        return self.research_results
+    
+    def get_research_summary(self) -> dict:
+        
+        #gets the summary of the research conducted
+        return{
+            'total_research': len(self.research_results),
+
+            'successful': sum(1 for r in self.research_results if r.get('success')), #1 for r in means gives '1' if research is successful
+            
+            'queries':  [r.get('query') for r in self.research_results],
+
+            'agent_memory': self.memory.get_summary()
+
+        }
+
+            
+
+
+    
+
+
+
+
 
