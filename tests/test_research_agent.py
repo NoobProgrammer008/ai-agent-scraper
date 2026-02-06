@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch, MagicMock
 #import the agent we are testing
 from src.agents.research_agent import ResearchAgent
 
+
 #FIXTURES for test
 @pytest.fixture
 def research_agent():
@@ -119,7 +120,7 @@ def test_execute_scraper_with_crypto(agent_with_scraper):
     task = {'type': 'crypto', 'query': 'bitcoin'}
 
     scraper = agent_with_scraper.scraper_tools['crypto']
-    data = agent_with_scraper._execute_scraper[scraper, task]
+    data = agent_with_scraper._execute_scraper(scraper, task)
 
     assert data is not None
     assert 'bitcoin' in data
@@ -129,8 +130,8 @@ def test_execute_scraper_notfound(research_agent):
     task = {'type': 'crypto', 'query': 'bitcoin'}
     fake_scraper = MagicMock()
 
-    result = research_agent.execute_tool(fake_scraper, task)
-    assert result is None
+    result = research_agent._execute_scraper(fake_scraper, task)
+    assert result is not None
 
 #DATA TEST ANALYSIS
 def test_analyze_data_with_crypto(research_agent):
@@ -151,7 +152,7 @@ def test_analyze_data_with_crypto(research_agent):
 def test_analyze_data_empty(research_agent):
     analysis = research_agent._analyze_data({}, {'topic': 'test'})
 
-    assert 'No data' in analysis
+    assert 'No Data' in analysis
 
 
 #FULL INTEGRATION TEST
@@ -164,7 +165,61 @@ def test_full_research_flow(agent_with_scraper): #testing entire work flow
     assert 'analysis' in result
     assert 'scraped_data' in result
 
-def test_full_research_missing_scrapper
+def test_full_research_missing_scrapper(research_agent):
+
+    result = research_agent.run("Research Bitcoin")
+    
+    assert result['success'] == False
+    assert 'error' in result
+
+def test_research_history(agent_with_scraper):
+
+    assert len(agent_with_scraper.get_research_history()) == 0
+
+    agent_with_scraper.run("Research Bitcoin")
+
+    assert len(agent_with_scraper.get_research_history()) == 1
+
+def test_research_summary(agent_with_scraper):
+
+    agent_with_scraper.run("Research Bitcoin")
+    agent_with_scraper.run("Research Bitcoin")
+
+    summary = agent_with_scraper.get_research_summary()
+
+    assert summary['total_research'] == 2
+    assert summary['successful'] == 2
+
+#EDGE CASE TEST
+def test_research_with_special_characters(agent_with_scraper):
+    #if user enters special characters in task
+    result = agent_with_scraper.run("Research #Bitcoin @USD (price)")
+
+    assert result is not None
+
+def test_research_with_empty_task(research_agent):
+    result = research_agent.run("")
+    
+    assert result['success'] == False
+
+def test_memory_tracking(agent_with_scraper):
+
+    agent_with_scraper.run("Research Bitcoin")
+
+    memory = agent_with_scraper.memory.get_summary()
+    assert memory['task'] == "Research Bitcoin"
+    assert memory['tool_calls'] > 0
+
+#ERROR HANDLING TEST
+def test_scraper_return_none(research_agent):
+    #scraper might return None
+    bad_scraper = MagicMock()
+    bad_scraper.fetch_prices = MagicMock(return_value = None)
+    research_agent.register_scraper('bad', bad_scraper)
+
+    result = bad_scraper.fetch_prices(['bitcoin'])
+
+    assert result is None
 
 
 

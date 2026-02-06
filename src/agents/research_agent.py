@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
-from base_agent import BaseAgent, Tool
+from .base_agent import BaseAgent, Tool
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class ResearchAgent(BaseAgent):
     #Agent that researches topics using web scrapers.
     def __init__(self):
-        super.__init__(
+        super().__init__(
             name = "ResearchAgent",
             description="Researches topics using web scrapers and analysis"
         )
@@ -36,7 +36,7 @@ class ResearchAgent(BaseAgent):
         # agent.register_scraper('crypto', crypto_scraper)
         # # Now agent can use CryptoScraper! 
 
-        self.scraper_tool[scraper_name] = scraper_object
+        self.scraper_tools[scraper_name] = scraper_object
 
         logger.info(f"Registered Scraper: {scraper_name}")
 
@@ -108,7 +108,7 @@ class ResearchAgent(BaseAgent):
 
         research_result['success'] = True #marked the research as successful
 
-        self.research_results.append(research_result)
+        self.search_results.append(research_result)
         logger.info("Research Completed Successfully")
         
         return research_result
@@ -188,17 +188,17 @@ class ResearchAgent(BaseAgent):
     def get_research_history(self) -> list:
 
         #get all the research history
-        return self.research_results
+        return self.search_results
     
     def get_research_summary(self) -> dict:
         
         #gets the summary of the research conducted
         return{
-            'total_research': len(self.research_results),
+            'total_research': len(self.search_results),
 
-            'successful': sum(1 for r in self.research_results if r.get('success')), #1 for r in means gives '1' if research is successful
+            'successful': sum(1 for r in self.search_results if r.get('success')), #1 for r in means gives '1' if research is successful
             
-            'queries':  [r.get('query') for r in self.research_results],
+            'queries':  [r.get('query') for r in self.search_results],
 
             'agent_memory': self.memory.get_summary()
 
