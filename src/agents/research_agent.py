@@ -22,7 +22,7 @@ class ResearchAgent(BaseAgent):
         self.analysis_tools = {}
 
         #now to store search results
-        self.search_results = [] #this tracks what we have researched
+        self.search_results = [] #[] #this tracks what we have researched
 
         self.max_research_depth = 3 #don't scrape more than 3 layers
         #max depth of research, this prevents infinite loop and to much scraping
