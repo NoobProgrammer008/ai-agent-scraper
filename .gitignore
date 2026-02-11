@@ -55,3 +55,9 @@ outputs/
 *.csv
 *.json
 temp/
+# Node modules
+frontend/node_modules/
+
+# Build
+frontend/build/
+*.egg-info/
