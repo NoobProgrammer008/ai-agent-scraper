@@ -1,160 +1,236 @@
+"""Real cryptocurrency scraper using CoinGecko API"""
+
 from __future__ import annotations
-from typing import Dict, List, Any
+
 import requests
 import logging
-
-#import the base scraper class
 from .base_scraper import BaseScraper
 
-#set up logging
-#each module has its own logger
 logger = logging.getLogger(__name__)
 
-#CRYPTO SCRAPER CLASS
+
 class CryptoScraper(BaseScraper):
-    BASE_URL = "https://api.coingecko.com/api/v3"
-    VALID_CRYPTOS = [
-        'bitcoin',
-        'ethereum',
-        'cardano',
-        'ripple',
-        'solana',
-        'polkadot',
-        'litecoin',
-        'dogecoin',
-        'chainlink',
-        'uniswap'
-    ]
-
-    #INITIALIZATION METHOD
-    def __init__(self, timeout: int =10, max_retries: int = 3):
-
-        #calls the class __init__ method from the base scraper
-        super().__init__(timeout=timeout , max_retries=max_retries)
-
-        #crypto specific initialization
-        self.current_currency = 'usd' #track the current currency which is usd by default
-        self.crypto_list = []
-
-        logger.info("CryptoScraper initialized successfully")
-
-
-    #BUILD CRYPTO URL METHOD
-    def build_price_url(self, crypto_ids: List[str], currency: str = 'usd') -> str:
-
-        crypto_string = ','.join(crypto_ids)
-
-        url = (
-            f"{self.BASE_URL}/simple/price"
-            f"?ids={crypto_string}"
-            f"&vs_currencies={currency}"
-            f"&include_24hr_change=true"
-            f"&include_market_cap=true"
-        )
-        logger.info(f"Built URL: {url}")
-        return url
+    """Scraper for real cryptocurrency data from CoinGecko API"""
     
-    #PARSE DATA (REQUIRED ABSTRACT METHOD)
-    def parse_data(self, response: requests.Response) -> Dict[str, Any]:
-        #Parse Crypto data from API response
-        #This implements the abstract method from BaseScraper
+    def __init__(self):
+        super().__init__(name="CryptoScraper")
+        
+        # CoinGecko API endpoint
+        self.base_url = "https://api.coingecko.com/api/v3"
+        
+        # Map common names to CoinGecko IDs
+        self.crypto_map = {
+            "bitcoin": "bitcoin",
+            "btc": "bitcoin",
+            "ethereum": "ethereum",
+            "eth": "ethereum",
+            "cardano": "cardano",
+            "ada": "cardano",
+            "ripple": "ripple",
+            "xrp": "ripple",
+            "solana": "solana",
+            "sol": "solana",
+            "litecoin": "litecoin",
+            "ltc": "litecoin",
+            "dogecoin": "dogecoin",
+            "doge": "dogecoin",
+        }
+        
+        logger.info("CryptoScraper Initialized")
+    
+    # ==================== ABSTRACT METHOD 1: FETCH ====================
+    
+    def fetch(self, query: str) -> dict:
+        if not self.validate_query(query):
+            return {"error": "Invalid query", "success": False}
+        
         try:
-            raw_data = response.json()
-
-        except ValueError as e:
-            logger.error(f"Failed to parse JSON: {e}")
-            return {}
-        
-        #transform raw data into structured format
-        parsed_data = {}
-
-        for crypto_name, prices in raw_data.items():
-            #loop through each cryptocurrency in the response
-            currency = list(prices.keys())[0]  #get the currency key (e.g., 'usd')
-
-            #extract and structure the data
-            parsed_data[crypto_name] = {
-                'price': prices.get(currency),
-                'currency': currency,
-                '24h_change': prices.get(f'{currency}_24_change'),
-                'market_cap': prices.get(f'{currency}_market_cap'),
-                'trending': self.is_trending(prices.get(f'{currency}_24h_change', 0))
-                #is_trending() = Custom method to check if trending
+            query_lower = query.lower()
+            
+            # Find matching crypto ID
+            crypto_id = None
+            for key, value in self.crypto_map.items():
+                if key in query_lower:
+                    crypto_id = value
+                    break
+            
+            # Default to bitcoin if not found
+            if not crypto_id:
+                crypto_id = "bitcoin"
+                logger.warning(f"Crypto not found for '{query}', defaulting to Bitcoin")
+            
+            # Make API request to CoinGecko
+            url = f"{self.base_url}/simple/price"
+            params = {
+                "ids": crypto_id,
+                "vs_currencies": "usd",
+                "include_market_cap": "true",
+                "include_24h_vol": "true",
+                "include_24h_change": "true"
             }
-
-        logger.info(f"Parsed data for {len(parsed_data)} cryptocurrencies")
-        return parsed_data
-    
-    #CUSTOM HELPER METHOD
-    def is_trending(self, price_change: float) -> bool:
-        #determine if a cryptocurrency is trending based on 24h price change
-        return abs(price_change) > 5.0 #abs Absolute value greater than 5%
-    
-    #VALIDATE DATA METHOD (OVERRIDE PARENT METHOD)
-    def validate_data(self, data: Dict[str, Any]) -> bool:
+            
+            logger.info(f"Fetching data for {crypto_id}...")
+            response = requests.get(url, params=params, timeout=5)
+            response.raise_for_status()
+            
+            # Parse the response
+            return self.parse_data(response)
         
-        #check if the data is empty
+        except requests.exceptions.Timeout:
+            error_msg = "Request timeout - CoinGecko server not responding"
+            logger.error(error_msg)
+            return {"error": error_msg, "success": False}
+        
+        except requests.exceptions.ConnectionError:
+            error_msg = "Connection error - check your internet connection"
+            logger.error(error_msg)
+            return {"error": error_msg, "success": False}
+        
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Request error: {str(e)}"
+            logger.error(error_msg)
+            return {"error": error_msg, "success": False}
+        
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            logger.error(error_msg)
+            return {"error": error_msg, "success": False}
+    
+    # ==================== ABSTRACT METHOD 2: PARSE_DATA ====================
+    
+    def parse_data(self, response: requests.Response) -> dict:
+        """
+        Parse cryptocurrency data from API response
+        
+        This implements the abstract method from BaseScraper
+        
+        Args:
+            response: requests.Response object from CoinGecko API
+        
+        Returns:
+            dict: Parsed cryptocurrency data
+        """
+        try:
+            data = response.json()
+            
+            if not data:
+                return {"error": "No data in response", "success": False}
+            
+            # Get first crypto in response
+            crypto_id = list(data.keys())[0]
+            crypto_data = data[crypto_id]
+            
+            formatted_response = {
+                "crypto_id": crypto_id.upper(),
+                "price_usd": f"${crypto_data['usd']:,.2f}",
+                "market_cap_usd": f"${crypto_data.get('usd_market_cap', 0):,.0f}",
+                "24h_volume_usd": f"${crypto_data.get('usd_24h_vol', 0):,.0f}",
+                "24h_change_percent": f"{crypto_data.get('usd_24h_change', 0):.2f}%",
+                "source": "CoinGecko API",
+                "success": True
+            }
+            
+            logger.info(f"Parsed cryptocurrency data")
+            return formatted_response
+        
+        except Exception as e:
+            logger.error(f"Error parsing data: {e}")
+            return {"error": str(e), "success": False}
+    
+    # ==================== CONVENIENCE METHODS ====================
+    
+    def fetch_prices(self, queries: list) -> dict:
+        """Fetch prices for multiple cryptocurrencies"""
+        results = {}
+        for query in queries:
+            results[query] = self.fetch(query)
+        return results
+    
+    def validate_data(self, data: dict) -> bool:
+        """Validate cryptocurrency data"""
         if not data:
-            logger.warning("Data is empty")
             return False
+        return data.get("success", False)
+
+
+# """Cryptocurrency scraper"""
+
+# import logging
+# from .base_scraper import BaseScraper
+
+# logger = logging.getLogger(__name__)
+
+
+# class CryptoScraper(BaseScraper):
+#     """Scraper for cryptocurrency data"""
+    
+#     def __init__(self):
+#         super().__init__(name="CryptoScraper")
         
-        #check each cryptocurrency's data
-        for crypto_name, crypto_data in data.items():
-            #check required fields
-            required_fields = ['price', 'currency', '24h_change']
-
-            for field in required_fields:
-                if field not in crypto_data:
-                    logger.warning(f"Missing field  '{field}' in {crypto_name}")
-                    return False
-                
-            #check if price is a positive number
-            price = crypto_data.get('price')
-
-            if price is None or price <= 0:
-                logger.warning(f"Invalid price for {crypto_name}: {price}")
-                return False
+#         # Mock cryptocurrency data
+#         self.crypto_data = {
+#             "bitcoin": {
+#                 "symbol": "BTC",
+#                 "price": "$45,000",
+#                 "change": "+2.5%",
+#                 "market_cap": "$882B"
+#             },
+#             "ethereum": {
+#                 "symbol": "ETH",
+#                 "price": "$2,500",
+#                 "change": "+1.8%",
+#                 "market_cap": "$301B"
+#             },
+#             "cardano": {
+#                 "symbol": "ADA",
+#                 "price": "$0.80",
+#                 "change": "+0.5%",
+#                 "market_cap": "$28B"
+#             },
+#             "ripple": {
+#                 "symbol": "XRP",
+#                 "price": "$2.10",
+#                 "change": "+3.2%",
+#                 "market_cap": "$114B"
+#             }
+#         }
     
-        logger.info("Data validation passed")
-        return True
-    
-    #FETCH PRICES (CONVENIENCE METHOD)
-    def fetch_prices(self, crypto_ids: List[str], currency: str = 'usd') -> Dict[str, Any]:
-        #method to fetch prices for a list of cryptocurrencies
+#     def fetch(self, query: str) -> dict:
+#         """Fetch cryptocurrency data"""
+#         if not self.validate_query(query):
+#             return {"error": "Invalid query"}
         
-        #build the URL
-        url = self.build_price_url(crypto_ids, currency)
-        # Use parent's run() method to do everything
-        # run() calls: fetch_url() → parse_data() → validate_data() → save_data()
-        result = self.run(url)
-
-        return result
+#         query_lower = query.lower()
+        
+#         # Search in data
+#         for crypto, data in self.crypto_data.items():
+#             if query_lower in crypto.lower():
+#                 logger.info(f"Found cryptocurrency data for {query}")
+#                 return {
+#                     "query": query,
+#                     "results": data,
+#                     "success": True
+#                 }
+        
+#         logger.warning(f"No data found for {query}")
+#         return {
+#             "query": query,
+#             "results": "Not found",
+#             "success": False
+#         }
     
-    #GET TRENDING CRYPTOS METHOD
-    def get_trending(self, min_change: float = 5.0) -> List[Dict[str, Any]]:
-        #get the list of trending cryptocurrencies based on 24h price change
-
-        trending_list = []
-
-        #loop through scraped data
-        for data_entry in self.scraped_data:
-
-            #check if this entry is for a crypto not metadata
-            if 'price' in data_entry and '24h_change' in data_entry:
-                change = data_entry.get('24h_change', 0)
-
-
-                #check if trending
-                if abs(change) >= min_change:
-                    trending_list.append({
-                        'name': data_entry.get('name', 'Unknown'),
-                        'price' : data_entry.get('price'),
-                        'change': change,
-                        'currency': data_entry.get('currency')
-                    })
-
-        logger.info(f"Found{len(trending_list)} trending cryptocurrencies")
-        return trending_list
+#     def fetch_prices(self, queries: list) -> dict:
+#         """Fetch prices for multiple cryptocurrencies"""
+#         results = {}
+#         for query in queries:
+#             data = self.fetch(query)
+#             results[query] = data.get('results', {})
+        
+#         return results
     
-
-
+#     def fetch_trending(self) -> dict:
+#         """Get trending cryptocurrencies"""
+#         return {
+#             "trending": list(self.crypto_data.keys()),
+#             "success": True
+#         }

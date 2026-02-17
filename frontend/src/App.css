@@ -1,4 +1,4 @@
-.App {
+/* .App {
   text-align: center;
 }
 
@@ -35,4 +35,95 @@
   to {
     transform: rotate(360deg);
   }
+} */
+/* Main app container */
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  /* Font family: use these fonts in order
+     "Segoe UI" = Windows font
+     Tahoma, Geneva = fallbacks
+     sans-serif = generic fallback
+  */
+  
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* Background gradient:
+     135deg = diagonal direction
+     #667eea = purple color at 0%
+     #764ba2 = darker purple at 100%
+  */
+  
+  min-height: 100vh;
+  /* Minimum height = full viewport height */
+  
+  margin: 0;
+  /* No default margin */
+  
+  padding: 0;
+  /* No default padding */
+}
+
+.app {
+  /* Main app container class */
+  
+  max-width: 1000px;
+  /* Maximum width 1000px */
+  
+  margin: 0 auto;
+  /* Center horizontally (0 top/bottom, auto left/right) */
+  
+  background: white;
+  /* White background */
+  
+  border-radius: 10px;
+  /* Rounded corners */
+  
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  /* Shadow:
+     0 10px = 10px down
+     40px = blur radius
+     rgba(0, 0, 0, 0.2) = black with 20% opacity
+  */
+  
+  overflow: hidden;
+  /* Hide content that overflows */
+}
+
+/* Button styling */
+button {
+  transition: all 0.3s ease;
+  /* Smooth animation when properties change
+     0.3s = duration
+     ease = timing function
+  */
+}
+
+button:hover:not(:disabled) {
+  /* When hovering over button (if not disabled) */
+  
+  transform: translateY(-2px);
+  /* Move up 2 pixels */
+  
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  /* Add shadow when hovering */
+}
+
+/* Input styling */
+input {
+  transition: all 0.3s ease;
+  /* Smooth animation */
+}
+
+input:focus {
+  /* When input is focused (clicked) */
+  
+  outline: none;
+  /* Remove default outline */
+  
+  border-color: #007bff !important;
+  /* Blue border
+     !important = override inline styles
+  */
+  
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
+  /* Blue shadow around input */
 }

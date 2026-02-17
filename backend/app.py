@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
-
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 # Add parent directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -12,16 +14,15 @@ from pydantic import BaseModel
 import json
 import asyncio
 import csv
-import os
 from datetime import datetime
 from typing import List
 
-# Import ONLY what actually exists
-from src.agents.research_agent import ResearchAgent
-
-# Remove imports that don't exist:
-# from src.utils.memory import Memory  ← DELETE THIS LINE
-# from src.scrapers.web_scraper import WebScraper  ← DELETE IF NOT NEEDED
+# Import your existing code
+try:
+    from src.agents.research_agent import ResearchAgent
+except ImportError as e:
+    print(f"Warning: Could not import ResearchAgent: {e}")
+    ResearchAgent = None
 
 # ==================== SETUP ====================
 app = FastAPI(title="Research Agent API")
@@ -42,6 +43,7 @@ if not os.path.exists(RESULTS_DIR):
     os.makedirs(RESULTS_DIR)
 
 # ==================== DATA MODELS ====================
+
 class ResearchRequest(BaseModel):
     query: str
     priority: str = "normal"
@@ -49,11 +51,13 @@ class ResearchRequest(BaseModel):
 # ==================== ENDPOINTS ====================
 
 @app.get("/")
-def health_check():
+def api_health_check():
+    #Check if API is running
     return {"status": "Research Agent API is online!"}
 
 @app.get("/history")
 def get_history(limit: int = 10):
+    #Get research history
     return {
         "count": len(RESEARCH_HISTORY),
         "history": RESEARCH_HISTORY[-limit:][::-1]
@@ -61,6 +65,7 @@ def get_history(limit: int = 10):
 
 @app.get("/results/{result_id}")
 def get_result(result_id: int):
+    #Get specific research result
     for result in RESEARCH_HISTORY:
         if result["id"] == result_id:
             return result
@@ -68,10 +73,12 @@ def get_result(result_id: int):
 
 @app.websocket("/ws/research")
 async def websocket_research(websocket: WebSocket):
+    #Real-time research streaming via WebSocket
     await websocket.accept()
     
     try:
         while True:
+            # Receive query from React
             message = await websocket.receive_text()
             request_data = json.loads(message)
             query = request_data.get("query")
@@ -83,32 +90,36 @@ async def websocket_research(websocket: WebSocket):
                 })
                 continue
             
+            # Send: Started
             await websocket.send_json({
                 "status": "started",
                 "message": f"Starting research on: {query}"
             })
+            await asyncio.sleep(0.3)  # ← Add delay
             
             try:
-                # Use your ResearchAgent
+                if ResearchAgent is None:
+                    raise Exception("ResearchAgent not imported")
+                
+                # Create agent
                 agent = ResearchAgent()
                 
+                # Send: In Progress
                 await websocket.send_json({
                     "status": "progress",
                     "message": "Searching the web..."
                 })
-                
+                await asyncio.sleep(0.5)  # ← Add delay
                 # Run agent
                 results = agent.run(query)
-                
-                # Get memory from agent if it has it
                 memory = agent.memory.get_summary() if hasattr(agent, 'memory') else {}
                 
+                # More progress
                 await websocket.send_json({
                     "status": "progress",
                     "message": "Analyzing findings...",
                     "tool_calls": memory.get("tool_calls", 0) if memory else 0
                 })
-                
                 await asyncio.sleep(0.5)
                 
                 # Save result
@@ -122,6 +133,7 @@ async def websocket_research(websocket: WebSocket):
                 }
                 RESEARCH_HISTORY.append(result_entry)
                 
+                # Send: Completed
                 await websocket.send_json({
                     "status": "completed",
                     "message": "Research complete!",
@@ -144,6 +156,7 @@ async def websocket_research(websocket: WebSocket):
 
 @app.post("/export/{result_id}")
 def export_result(result_id: int):
+    #Export research result as CSV
     result = None
     for r in RESEARCH_HISTORY:
         if r["id"] == result_id:
@@ -153,8 +166,8 @@ def export_result(result_id: int):
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
     
+    # Create CSV
     filename = f"{RESULTS_DIR}/research_{result_id}.csv"
-    
     with open(filename, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow(["Query", "Timestamp", "Findings"])
@@ -168,6 +181,7 @@ def export_result(result_id: int):
 
 @app.delete("/results/{result_id}")
 def delete_result(result_id: int):
+    #Delete a research result
     global RESEARCH_HISTORY
     original_length = len(RESEARCH_HISTORY)
     RESEARCH_HISTORY = [r for r in RESEARCH_HISTORY if r["id"] != result_id]
@@ -175,6 +189,7 @@ def delete_result(result_id: int):
     if len(RESEARCH_HISTORY) == original_length:
         raise HTTPException(status_code=404, detail="Result not found")
     
+    # Delete CSV file if exists
     filename = f"{RESULTS_DIR}/research_{result_id}.csv"
     if os.path.exists(filename):
         os.remove(filename)
@@ -184,7 +199,4 @@ def delete_result(result_id: int):
 # ==================== RUN ====================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app)
-
-
-
+    uvicorn.run(app, host="0.0.0.0", port=8000)

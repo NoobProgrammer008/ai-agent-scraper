@@ -74,18 +74,13 @@
                     color: "white",
                     border: "none",
                     borderRadius: "5px",
-                    cursor: loading ? "not-allowed" : "pointer"
-
-
+                    cursor: loading ? "not-allowed" : "pointer",
                 }}
             >
+                {loading ? "Searching..": "Search"}
                 
             </button>
-
-
-            </div>
-            </div>
-
-        
-    )
+        </div>
+    </div>
+    );
  }
